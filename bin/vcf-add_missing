@@ -1,0 +1,116 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use Getopt::Std;
+use Set::IntSpan;
+use File::Basename;
+use Data::Dumper;
+use Text::CSV qw(csv);
+use File::Slurp;
+use List::Util qw(sum);
+
+@ARGV==2 or usage(1);
+my($vcf_fn,$paf_fn) = @ARGV;
+
+#.......................................
+
+my $total_bp = 0;
+my %gone;
+my @vcf = read_file($vcf_fn);
+foreach (@vcf) {
+# ##contig=<ID=NZ_PYZC01000002,length=96018>
+  next unless m/<ID=(\S+?),length=(\d+)/;
+  $gone{$1} = Set::IntSpan->new("1-$2");
+  #msg("Ref $1 1-$2");
+  $total_bp += $2;
+}
+#msg(Dumper(\%gone));
+#msg("Found",scalar(keys %gone),"contigs");
+#map { 
+#  msg($_, $gone{$_}->size, $gone{$_}->run_list)
+#} sort keys %gone;
+
+#.......................................
+
+#BED
+#1 chr
+#2 begin inclusive, 0 based
+#3 end exclusive, 0 based
+#4 name - Label to be displayed under the feature, if turned on in "Configure this page".
+#5 score - A score between 0 and 1000. See track lines, below, for ways to configure the display style of scored data.
+#6 strand - defined as + (forward) or - (reverse).
+
+#Column	Name	Data Type	Description
+#1	qname	string	Query sequence name
+#2	qlen	int	Query sequence length
+#3	qstart	int	Query start coordinate (0-based)
+#4	qend	int	Query end coordinate (0-based)
+#5	strand	char	‘+’ if query/target on the same strand; ‘-’ if opposite
+#6	tname	string	Target sequence name
+#7	tlen	int	Target sequence length
+#8	tstart	int	Target start coordinate on the original strand
+#9	tend	int	Target end coordinate on the original strand
+#10	nmatch	int	Number of matching bases in the mapping
+#11	alen	int	Number of bases, including gaps, in the mapping
+#12	mapq	int	Mapping quality (0-255, with 255 if missing)
+
+my $missing = 0;
+my $paf = csv(in=>$paf_fn, sep_char=>"\t");
+#msg(Dumper($p));
+for my $a (@$paf) {
+  # need to filter on mapq here?
+  next unless $a->[11] >= 5;
+  # subtract the aligned part 
+  $gone{ $a->[5] } -=
+    (1+$a->[7]).'-'.(1+$a->[8])
+}
+
+#print Dumper(0+keys(%gone), \%gone);
+#msg("MISSING:");
+#map { 
+#  msg($_, $gone{$_}->size."\t".$gone{$_}->run_list)
+#} sort keys %gone;
+
+# output bed file
+for my $id (sort keys %gone) {
+  #next if $gone{$id}->empty;
+  #msg("$id size", $gone{$id}->size);
+  for my $s ($gone{$id}->spans) {
+    print join("\t", $id, $s->[0]-1, $s->[1]),"\n";
+  }
+}
+
+# output augmented VCF file
+for my $id (sort keys %gone) {
+  #next if $gone{$id}->empty;
+  #msg("$id size", $gone{$id}->size);
+#  for my $s ($gone{$id}->spans) {
+#    print join("\t", 
+#      $id, $s->[0]-1, $s->[1],
+#    ),"\n";
+#  }
+}
+
+
+
+my $missing_bp = sum(
+ map { $_->size } values %gone
+);
+my $pc = sprintf "%.2f", $missing_bp*100/$total_bp;
+msg( "Missing $missing_bp of $total_bp bp ($pc%)" );
+
+#.......................................
+
+sub msg { print STDERR "@_\n"; }
+
+sub err { msg("ERROR:", @_); exit(-1); }
+
+sub usage {
+  my $ec = shift;
+  my $exe = basename($0);
+  msg("USAGE: $exe in.vcf in.paf > out.bed");
+  exit($ec);
+}
+  
+#.......................................
+

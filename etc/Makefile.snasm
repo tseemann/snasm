@@ -1,0 +1,117 @@
+
+ALEN := 50
+OUT := snasm
+
+
+SHELL := bash
+CP := cp -v -f
+MV := mv -v -f
+
+MAKEFLAGS += --no-builtin-rules
+MAKEFLAGS += --no-builtin-variables
+
+.SUFFIXES:
+.DELETE_ON_ERROR:
+.SECONDARY:
+.ONESHELL:
+.DEFAULT: all
+.PHONY: all clean ids
+
+IDS := $(shell cat $(IDFILE))
+VCF_FILES := $(addsuffix /vcf.gz,$(IDS))
+CNS_FILES := $(addsuffix /cns,$(IDS))
+
+all : $(OUT).core.aln
+	seqkit fx2tab $< | less -S
+
+$(OUT).core.aln : $(OUT).aln
+	goalign compress < $< > $@
+#	snp-sites $< > $@
+
+
+#all : $(OUT).vcf $(OUT).nwk
+#	gotree stats < $(word 2,$^) \
+#	| csvtk transpose -t \
+#	| csvtk pretty
+
+$(OUT).nwk : $(OUT).treefile
+	$(CP) $< $@
+	gotree draw text < $<
+
+$(OUT).treefile : $(OUT).aln
+	iqtree2 \
+	-T $(CPUS) \
+	-s $< \
+	--prefix $(OUT) \
+	-m GTR \
+	--ufboot 1000 \
+	-redo
+
+# add golign clean sites here
+$(OUT).aln : $(OUT).afa
+	$(CP) $< $@
+
+$(OUT).afa : $(CNS_FILES)
+	cat $^ > $@
+
+#$(OUT).vcf : $(OUT).vcf.fofn
+$(OUT).vcf : $(VCF_FILES)
+	bcftools merge \
+	--threads $(CPUS) \
+	--missing-to-ref \
+	$^ > $@
+#	--no-index
+#	--file-list $< > $@
+
+#$(OUT).vcf.fofn : $(IDFILE) $(VCF_FILES)
+#	parallel -a $< -j 1 \
+#	"echo {}/vcf.gz" > $@
+
+%/cns : %/cns1
+	( echo ">$*" \
+	; grep -v '>' $< ) \
+	| seqkit seq \
+	> $@
+
+# don't include insertions
+
+%/cns1 : $(REF) %/bed %/vcf.gz
+	bcftools consensus \
+	-f $< \
+	-s $* \
+	--exclude '%ILEN>0' \
+	--mask $(word 2,$^) \
+	--mask-with '-' \
+	--mark-snv lc \
+	--mark-del '-' \
+	-o $@ \
+	$(word 3,$^)
+
+%/vcf.gz : %/vcf
+	bcftools convert -Oz $< > $@
+	bcftools index $@
+
+%/bed : %/vcf %/paf
+	$(VCFADD) $^ > $@
+
+%/vcf : $(REF) %/paf
+	paftools.js call \
+	-L $(ALEN) -l $(ALEN) -s $* \
+	-f $^ > $@
+
+%/paf : $(REF) %/fna
+	minimap2 \
+	-x asm20 -t 1 -c --cs \
+	$+ \
+	| sort -k6,6 -k8,8n \
+	> $@
+
+%/fna : %/input
+	any2fasta -n -u $< > $@
+
+ids : $(IDFILE)
+	echo $(IDS)
+	echo $(VCF_FILES)
+	echo $(CNS_FILES)
+
+

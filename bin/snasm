@@ -1,0 +1,155 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use Getopt::Std;
+use File::Basename;
+use Data::Dumper;
+use Cwd 'abs_path';
+use File::Slurp;
+
+use FindBin;
+use lib "$FindBin::RealBin/../perl5";
+use Snasm;
+
+#......................................................................................
+
+our $VERSION = "0.0.1";
+our $EXE = basename($0);
+our $URL = 'https://github.com/tseemann/snasm';
+
+$ENV{'PATH'} .= ":$FindBin::RealBin";
+
+
+#......................................................................................
+
+my %opt = (
+  'c' => '0.95',
+  'j' => cpus(),
+  'L' => 200,
+  'M' => abs_path("$FindBin::RealBin/../etc/Makefile.$EXE"),
+);
+
+sub usage {
+  my($errcode) = @_;
+  $errcode ||= 0;
+  my $ofh = $errcode ? \*STDERR : \*STDOUT;
+  print $ofh 
+    "NAME\n  $EXE $VERSION\n",
+    "SYNOPSIS\n  Core genome alignments from assemblues\n",
+    "USAGE\n  $EXE [opts] -d OUTDIR [-r SEQ] <SEQ SEQ ...>",
+    "OPTIONS\n",
+    "  -h       Show this help\n",
+    "  -v       Print version and exit\n",
+    "  -j CPUS  Threads to use [$opt{j}]\n",
+    "  -r SEQ   Reference genome\n",
+    "  -d       output folder\n",
+    "  -f       Force folder overwrite\n",
+    "  -a       Make an alignment\n",
+    "  -L LEN   Minimum alignment block [$opt{L}]\n",
+    "  -t       Make a tree\n",
+    "  -c CORE  Fuzzy core percent [$opt{c}]\n",
+    "  -M FILE  Makefile template [$opt{M}]\n",
+    "HOMEPAGE\n  $URL\n",
+    "END\n";
+  exit($errcode);
+}
+
+sub version {
+  print "$EXE $VERSION\n";
+  exit(0);
+}
+
+#......................................................................................
+
+
+getopts('vhfatr:c:d:L:M:', \%opt) or exit(-1);
+
+$opt{'v'} and version();
+$opt{'h'} and usage(0);
+msg("This is $EXE $VERSION");
+
+#$opt{'r'} or err("Need -r reference genome");
+$opt{'d'} or err("Need -d output folder");
+my $cpus = $opt{j} // 1;
+
+@ARGV or err("Need some sequence files");
+
+exe($_) for qw'parallel minimap2 any2fasta paftools.js samtools bcftools bedtools goalign sort';
+exe('vcf-add_missing');
+
+#......................................................................................
+
+my @id;
+my %id;
+unshift(@ARGV, $opt{r}) if $opt{r};
+#my $ref = $opt{'r'} // shift(@ARGV);
+my @file = map { abs_path($_) } @ARGV;
+#msg(Dumper(\@file));
+
+for my $f (@file) {
+  my $id = filename_to_id($f);
+  exists $id{$id} and err("ID '$id' already exists");
+  msg("Checking $id: $f");
+  -f $f && -r _ or err("Not a readable file '$f'");
+  #run("any2fasta -q -n -u '$f'> $id.fna");
+  $id{$id} = $f;
+  push @id, $id;
+}
+
+msg("Reference: $id[0]");
+msg("samples:", scalar(@id));
+
+run("mkdir -p '$opt{d}'");
+chdir($opt{d});
+run("rm -fr ./*");
+for my $id (@id) {
+  run("mkdir -p $id");
+  run("ln -s $id{$id} $id/input");
+}
+
+my $idfile = "$EXE.ids";
+my $make = "# $EXE $VERSION\n\n";
+$make .= "CPUS := $cpus\n";
+$make .= "REF := $id[0]/fna\n";
+$make .= "VCFADD := $FindBin::RealBin/vcf-add_missing\n";
+$make .= "IDFILE := $idfile\n";
+$make .= read_file($opt{M});
+
+write_file('Makefile', $make);
+write_file($idfile, map { "$_\n" } @id);
+  
+#run("wc -l *.vcf");
+#run("ls");
+msg("Done");
+
+#......................................................................................
+
+
+#......................................................................................
+#Column	Name	Data Type	Description
+#1	qname	string	Query sequence name
+#2	qlen	int	Query sequence length
+#3	qstart	int	Query start coordinate (0-based)
+#4	qend	int	Query end coordinate (0-based)
+#5	strand	char	‘+’ if query/target on the same strand; ‘-’ if opposite
+#6	tname	string	Target sequence name
+#7	tlen	int	Target sequence length
+#8	tstart	int	Target start coordinate on the original strand
+#9	tend	int	Target end coordinate on the original strand
+#10	nmatch	int	Number of matching bases in the mapping
+#11	alen	int	Number of bases, including gaps, in the mapping
+#12	mapq	int	Mapping quality (0-255, with 255 if missing)
+
+
+
+#......................................................................................
+
+sub filename_to_id {
+  my($s) = @_;
+  $s = basename($s);
+  $s =~ s/\..*$//;
+  # change / and spaces to _
+  $s =~ s,[\s/],_,g;
+  return $s;
+}
+
