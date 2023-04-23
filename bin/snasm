@@ -4,7 +4,7 @@ use warnings;
 use Getopt::Std;
 use File::Basename;
 use Data::Dumper;
-use Cwd 'abs_path';
+use Cwd qw'abs_path getcwd';
 use File::Slurp;
 use File::Path qw(make_path remove_tree);
 
@@ -14,7 +14,7 @@ use Snasm;
 
 #......................................................................................
 
-my $VERSION = "0.0.5";
+my $VERSION = "0.0.6";
 my $EXE = basename($0);
 my $URL = 'https://github.com/tseemann/$EXE';
 my $MAKEFILE = abs_path("$FindBin::RealBin/../etc/Makefile.$EXE"),
@@ -93,7 +93,9 @@ my($dir,$force) = @opt{'d', 'f'};
 
 # add ref to start of genomes if provides
 unshift(@ARGV, $opt{r}) if $opt{r};
-@ARGV = map { abs_path($_) } @ARGV;
+my $cwd = getcwd();
+@ARGV = map { m,^/, ? $_ : "$cwd/$_" } @ARGV;
+#@ARGV = map { abs_path($_) } @ARGV;
 #msg(Dumper(\@ARGV));
 
 my %seq;
@@ -142,7 +144,8 @@ msg("Done.");
 sub filename_to_id {
   my($s) = @_;
   $s = basename($s);
-  $s =~ s/\..*$//;
+  #$s =~ s/\..*$//;
+  $s =~ s/\.(gbk|gb|gbff|fa|fna|fasta|ffn|gfa|gff)(\.(gz|xz|zstd|bz2|Z))?$//;
   # change / and spaces to _
   $s =~ s,[\s/],_,g;
   return $s;

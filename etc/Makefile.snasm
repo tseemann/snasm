@@ -64,11 +64,8 @@ $(OUT).vcf.fofn : $(IDFILE) $(VCF_GZ_FILES)
 $(OUT).vcf : $(OUT).vcf.fofn
 	bcftools merge \
 	--threads $(CPUS) \
-	--missing-to-ref \
 	--file-list $< \
-	> $@
-
-#	--no-index
+	--output $@
 
 #$(OUT).vcf : $(VCF_GZ_FILES)
 #	bcftools merge \
@@ -93,7 +90,7 @@ $(OUT).vcf : $(OUT).vcf.fofn
 	--mask-with '-' \
 	--mark-snv lc \
 	--mark-del '-' \
-	-o $@ \
+	--output $@ \
 	$(word 2,$^)
 
 %/vcf.gz : %/vcf
@@ -104,11 +101,12 @@ $(REF).dict : $(REF)
 	samtools faidx $<
 	cut -f1,2 $(<).fai > $@
 
-
 %/aligned.bed : %/paf
 	cut -f 6,8,9 $< \
 	| bedtools sort -i stdin \
 	> $@
+
+##	| csvtk mutate2 -t -H -e '$$2 + 1' \
 
 %/missing.bed : $(REF).dict %/aligned.bed
 	bedtools complement \
@@ -117,7 +115,7 @@ $(REF).dict : $(REF)
 	> $@
 
 %/vcf : $(REF) %/paf
-	paftools.js call \
+	-paftools.js call \
 	-L $(ALEN) -l $(ALEN) -s $* \
 	-f $^ > $@
 
