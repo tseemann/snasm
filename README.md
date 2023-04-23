@@ -22,9 +22,9 @@ is still somewhat manual:
 git clone https://github.com/tseemann/snasm.git
 
 conda create -n snasm \
-  any2fasta minimap2 paftools bedtools \
+  any2fasta minimap2 bedtools snp-sites\
   'bcftools>=1.17' 'samtools>=1.17' \
-  seqkit csvtk snp-dists goalign gotree iqtree \
+  seqkit csvtk goalign gotree iqtree \
   perl-bioperl-core perl-file-slurp \
   perl-file-which perl-text-csv
 
