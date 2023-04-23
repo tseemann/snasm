@@ -23,6 +23,7 @@ foreach (@vcf) {
   $gone{$1} = Set::IntSpan->new("1-$2");
   #msg("Ref $1 1-$2");
   $total_bp += $2;
+  #print "$1:1-1\n";
 }
 #msg(Dumper(\%gone));
 #msg("Found",scalar(keys %gone),"contigs");
@@ -71,12 +72,15 @@ for my $a (@$paf) {
 #  msg($_, $gone{$_}->size."\t".$gone{$_}->run_list)
 #} sort keys %gone;
 
-# output bed file
+# output bed file OR "regiond file"
+#print "_DUMMY\t0\t0\n";
 for my $id (sort keys %gone) {
   #next if $gone{$id}->empty;
   #msg("$id size", $gone{$id}->size);
   for my $s ($gone{$id}->spans) {
-    print join("\t", $id, $s->[0]-1, $s->[1]),"\n";
+    #print join("\t", $id, $s->[0]-1, $s->[1]),"\n";
+    print join("\t", $id, $s->[0], $s->[1]),"\n";
+    #print $id,':',$s->[0],'-',$s->[1],"\n";
   }
 }
 

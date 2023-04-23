@@ -14,7 +14,7 @@ use Snasm;
 
 #......................................................................................
 
-my $VERSION = "0.0.2";
+my $VERSION = "0.0.3";
 my $EXE = basename($0);
 my $URL = 'https://github.com/tseemann/$EXE';
 my $MAKEFILE = abs_path("$FindBin::RealBin/../etc/Makefile.$EXE"),
@@ -28,6 +28,7 @@ my %opt = (
   'c' => '0.95',
   'j' => cpus(),
   'L' => 50,
+  'p' => $EXE,
 );
 
 sub usage {
@@ -45,6 +46,7 @@ sub usage {
     "  -r FILE  Reference genome [use first genome]\n",
     "  -d DIR   Output folder\n",
     "  -f       Force folder overwrite\n",
+    "  -p NAME  Result file prefix [$opt{p}]\n",
     "  -L INT   Minimum alignment block [$opt{L}]\n",
     "  -t       Also make a tree\n",
     "  -c FLOAT Fuzzy core percent [$opt{c}]\n",
@@ -61,20 +63,23 @@ sub version {
 #......................................................................................
 
 
-getopts('vhftr:c:d:L:', \%opt) or exit(-1);
+getopts('vhftr:c:d:L:j:p:', \%opt) or exit(-1);
 
 $opt{'v'} and version();
 $opt{'h'} and usage(0);
 msg("This is $EXE $VERSION");
 #$opt{'r'} or err("Need -r reference genome");
 $opt{'d'} or err("Need -d output folder");
-my $cpus = $opt{j} // 1;
+my $cpus = $opt{j} || 1;
+my $prefix = $opt{p} || $EXE;
+$prefix =~ m/\s/ and err("No whitespace allowed in -p '$prefix'");
 
 @ARGV or err("Need some sequence files");
 
+exe($_) for qw'sort tee make';
 exe($_) for qw'parallel minimap2 any2fasta
  paftools.js bcftools goalign sort seqkit';
-exe('vcf-add_missing');
+#exe('vcf-add_missing');
 
 my($dir,$force) = @opt{'d', 'f'};
 #msg("dir=$dir force=$force");
@@ -111,16 +116,19 @@ for my $id (@id) {
   run("ln -f -s '$seq{$id}' '$id/input'");
 }
 
-my $idfile = "$EXE.ids";
+my $idfile = "$prefix.ids";
+write_file($idfile, map { "$_\n" } @id);
+
 my $make = "# $EXE $VERSION\n\n";
 $make .= "CPUS := $cpus\n";
-$make .= "REF := $id[0]/fna\n";
-$make .= "VCFADD := $FindBin::RealBin/vcf-add_missing\n";
+$make .= "REF := $ref_id/fna\n";
+$make .= "ALEN := $opt{L}\n";
+$make .= "OUT := $prefix\n";
+#$make .= "VCFADD := $FindBin::RealBin/vcf-add_missing\n";
 $make .= "IDFILE := $idfile\n";
 $make .= read_file($MAKEFILE);
 
 write_file('Makefile', $make);
-write_file($idfile, map { "$_\n" } @id);
 
 run("make -j $cpus |& tee $EXE.log");  
 
