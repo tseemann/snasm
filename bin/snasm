@@ -14,7 +14,7 @@ use Snasm;
 
 #......................................................................................
 
-my $VERSION = "0.0.4";
+my $VERSION = "0.0.5";
 my $EXE = basename($0);
 my $URL = 'https://github.com/tseemann/$EXE';
 my $MAKEFILE = abs_path("$FindBin::RealBin/../etc/Makefile.$EXE"),

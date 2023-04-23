@@ -20,12 +20,14 @@ CNS_FILES := $(addsuffix /cns,$(IDS))
 ALIGNED_BED_FILES := $(addsuffix /aligned.bed,$(IDS))
 
 all : $(OUT).core.aln $(OUT).vcf $(OUT).cov
-	#seqkit fx2tab $< | less -S
-	#csvtk pretty $(OUT).cov
+	csvtk pretty -H -t $(OUT).cov
 
 $(OUT).cov : $(REF).dict $(ALIGNED_BED_FILES)
 	parallel -a $(IDFILE) -j $(CPUS) \
-	"bedtools genomecov -g $< -i {}/aligned.bed -max 1" \
+	"bedtools genomecov -g $< -i {}/aligned.bed -max 1 \
+	 | tail -n 1| cut -f1,5 \
+         | sed 's/^genome/{}/' \
+        " \
 	> $@
 
 $(OUT).core.aln : $(OUT).aln
