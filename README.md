@@ -1,4 +1,4 @@
-[![License: GPLv3](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-3.0.en.html)
+[![License: GPLv3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-3.0.en.html)
 ![Don't judge me](https://img.shields.io/badge/Language-Perl_5-steelblue.svg)
 
 # snasm
@@ -21,14 +21,16 @@ is still somewhat manual:
 ```
 git clone https://github.com/tseemann/snasm.git
 
-export PATH=$PATH:$PWD/snasm/bin
-
 conda create -n snasm \
   any2fasta minimap2 paftools bedtools \
   'bcftools>=1.17' 'samtools>=1.17' \
   seqkit csvtk snp-dists goalign gotree iqtree \
   perl-bioperl-core perl-file-slurp \
   perl-file-which perl-text-csv
+
+conda activate snasm
+
+export PATH=$PATH:$PWD/snasm/bin
 
 snasm -h
 ```
