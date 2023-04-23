@@ -84,9 +84,9 @@ of sample names (ids).
 The name `snasm` is a contraction of the
 words "SNP" and "Assembly".
 
-## Cutatuib
+## Citation
 
-* Seemann T, `snasm` **Github** https://github.com/tseemann/snasm
+Seemann T, SNP based alignments from assemblies  **Github** https://github.com/tseemann/snasm
 
 ## Feedback
 
