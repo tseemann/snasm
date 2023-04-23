@@ -14,7 +14,7 @@ use Snasm;
 
 #......................................................................................
 
-my $VERSION = "0.0.3";
+my $VERSION = "0.0.4";
 my $EXE = basename($0);
 my $URL = 'https://github.com/tseemann/$EXE';
 my $MAKEFILE = abs_path("$FindBin::RealBin/../etc/Makefile.$EXE"),
@@ -50,6 +50,7 @@ sub usage {
     "  -L INT   Minimum alignment block [$opt{L}]\n",
     "  -t       Also make a tree\n",
     "  -c FLOAT Fuzzy core percent [$opt{c}]\n",
+    "  -y       Dry run, just set up folders\n",
     "HOMEPAGE\n  $URL\n",
     "END\n";
   exit($errcode);
@@ -63,7 +64,7 @@ sub version {
 #......................................................................................
 
 
-getopts('vhftr:c:d:L:j:p:', \%opt) or exit(-1);
+getopts('vhftyr:c:d:L:j:p:', \%opt) or exit(-1);
 
 $opt{'v'} and version();
 $opt{'h'} and usage(0);
@@ -130,7 +131,9 @@ $make .= read_file($MAKEFILE);
 
 write_file('Makefile', $make);
 
-run("make -j $cpus |& tee $EXE.log");  
+$opt{'y'} 
+? msg("Run pipeline:\nmake -j $cpus -C",abs_path('.'))
+: run("make -j $cpus |& tee $EXE.log");  
 
 msg("Done.");
 
