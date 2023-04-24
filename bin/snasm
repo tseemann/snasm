@@ -42,9 +42,10 @@ sub usage {
     "OPTIONS\n",
     "  -h       Show this help\n",
     "  -v       Print version and exit\n",
-    "  -j INT   Threads to use [$opt{j}]\n",
+    "  -i FOFN  File of input filenames\n",
     "  -r FILE  Reference genome [use first genome]\n",
     "  -d DIR   Output folder\n",
+    "  -j INT   Threads to use [$opt{j}]\n",
     "  -f       Force folder overwrite\n",
     "  -p NAME  Result file prefix [$opt{p}]\n",
     "  -L INT   Minimum alignment block [$opt{L}]\n",
@@ -64,7 +65,7 @@ sub version {
 #......................................................................................
 
 
-getopts('vhftyr:c:d:L:j:p:', \%opt) or exit(-1);
+getopts('vhftyr:c:d:L:j:p:i:', \%opt) or exit(-1);
 
 $opt{'v'} and version();
 $opt{'h'} and usage(0);
@@ -75,7 +76,7 @@ my $cpus = $opt{j} || 1;
 my $prefix = $opt{p} || $EXE;
 $prefix =~ m/\s/ and err("No whitespace allowed in -p '$prefix'");
 
-@ARGV or err("Need some sequence files");
+@ARGV || $opt{i} or err("Need some sequence files");
 
 exe($_) for qw'sort tee make';
 exe($_) for qw'parallel minimap2 any2fasta
@@ -91,19 +92,36 @@ my($dir,$force) = @opt{'d', 'f'};
 #wrn("debug exit"); exit;
 #......................................................................................
 
+# array of all files to process
+my @file;
+
+my $fofn = $opt{'i'};
+if ($fofn and -r $fofn) {
+  @file = read_file($fofn);
+  chomp @file;
+  msg("Added", 0+@file, "files from -i $fofn");
+}
+
+push @file, @ARGV;
+msg("Added", 0+@ARGV, "files from cmdline");
+
 # add ref to start of genomes if provides
-unshift(@ARGV, $opt{r}) if $opt{r};
+if ($opt{'r'}) {
+  unshift(@file, $opt{r});
+  msg("Added 1 reference file");
+}
+
 my $cwd = getcwd();
-@ARGV = map { m,^/, ? $_ : "$cwd/$_" } @ARGV;
+@file = map { m,^/, ? $_ : "$cwd/$_" } @file;
 #@ARGV = map { abs_path($_) } @ARGV;
 #msg(Dumper(\@ARGV));
 
 my %seq;
 my $ref_id;
-for my $file (@ARGV) {
+for my $file (@file) {
   my $id = filename_to_id($file);
   $ref_id //= $id; # choose first genome
-  msg("[$id] checking '$file'");
+  msg("Checking $id =>$file");
   exists $seq{$id} and err("ID '$id' already used");
   -f $file && -r _ or err("Problem with file '$file'");
   $seq{$id} = $file;

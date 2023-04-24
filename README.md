@@ -41,6 +41,9 @@ snasm -h
 # Align all FASTA files, use first one as reference
 % snasm -d outdir asms/*.fasta
 
+# Provide a list of filenames in a file
+% snasm -d outdir -i genomes.fofn
+
 # Choose a specific reference
 % snasm -d outdir -r ref.gbk asms/*.fa
 
