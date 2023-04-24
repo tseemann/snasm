@@ -3,24 +3,24 @@ use strict;
 use warnings;
 use Getopt::Std;
 use File::Basename;
-use Data::Dumper;
-use Cwd qw'abs_path getcwd';
 use File::Slurp;
-use File::Path qw(make_path remove_tree);
-
+#use File::Path qw'make_path remove_tree';
+use File::Which;
+use Cwd qw'abs_path getcwd';
+use Data::Dumper;
 use FindBin;
-use lib "$FindBin::RealBin/../perl5";
-use Snasm;
+#use lib "$FindBin::RealBin/../perl5";
+#use Snasm;
 
 #......................................................................................
 
-my $VERSION = "0.0.6";
+my $VERSION = "0.1.0";
 my $EXE = basename($0);
 my $URL = 'https://github.com/tseemann/$EXE';
 my $MAKEFILE = abs_path("$FindBin::RealBin/../etc/Makefile.$EXE"),
 
 # add bundles tools to PATH
-$ENV{'PATH'} .= ":$FindBin::RealBin";
+#$ENV{'PATH'} .= ":$FindBin::RealBin";
 
 #......................................................................................
 
@@ -141,6 +141,7 @@ msg("Done.");
 
 #......................................................................................
 
+
 sub filename_to_id {
   my($s) = @_;
   $s = basename($s);
@@ -150,5 +151,43 @@ sub filename_to_id {
   $s =~ s,[\s/],_,g;
   return $s;
 }
+
+#......................................................................................
+
+sub msg { print STDERR "@_\n"; }
+sub wrn { msg("WARNING:", @_); }
+sub err { msg("ERROR:", @_); exit(1); }
+
+#......................................................................................
+
+sub cpus {
+  my($c) = qx'nproc --all';
+  chomp $c;
+  return $c || 1;
+}
+
+#......................................................................................
+
+sub exe {
+  my($tool) = @_;
+  my $path = which($tool);
+  $path ? msg("Found '$tool' - $path")
+        : err("Can't find '$tool' - please install it");
+  return $path;
+}
+
+#......................................................................................
+
+sub run {
+  msg("Running:", @_);
+  system(@_)==0 or err("Could not run: @_");
+}
+#......................................................................................
+
+
+
+#......................................................................................
+
+
 
 #......................................................................................
