@@ -4,6 +4,8 @@ SHELL := bash
 CP := cp -v -f
 MV := mv -v -f
 
+MINIMAP2 := minimap2 -x asm20 -t 1 -c --cs
+
 MAKEFLAGS += --no-builtin-rules
 MAKEFLAGS += --no-builtin-variables
 
@@ -19,7 +21,7 @@ VCF_GZ_FILES := $(addsuffix /vcf.gz,$(IDS))
 CNS_FILES := $(addsuffix /cns,$(IDS))
 ALIGNED_BED_FILES := $(addsuffix /aligned.bed,$(IDS))
 
-all : $(OUT).core.aln $(OUT).vcf $(OUT).cov
+all : $(OUT).core.aln $(OUT).cov
 	csvtk pretty -H -t $(OUT).cov
 
 $(OUT).cov : $(REF).dict $(ALIGNED_BED_FILES)
@@ -99,7 +101,7 @@ $(OUT).vcf : $(OUT).vcf.fofn
 
 $(REF).dict : $(REF)
 	samtools faidx $<
-	cut -f1,2 $(<).fai > $@
+	cut -f1,2 $(<).fai | sort > $@
 
 %/aligned.bed : %/paf
 	cut -f 6,8,9 $< \
@@ -120,9 +122,7 @@ $(REF).dict : $(REF)
 	-f $^ > $@
 
 %/paf : $(REF) %/fna
-	minimap2 \
-	-x asm20 -t 1 -c --cs \
-	$+ \
+	$(MINIMAP2) $+ \
 	| sort -k6,6 -k8,8n \
 	> $@
 
