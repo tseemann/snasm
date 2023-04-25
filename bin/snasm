@@ -14,10 +14,12 @@ use FindBin;
 
 #......................................................................................
 
-my $VERSION = "0.1.0";
+my $VERSION = "0.2.0";
 my $EXE = basename($0);
 my $URL = 'https://github.com/tseemann/$EXE';
-my $MAKEFILE = abs_path("$FindBin::RealBin/../etc/Makefile.$EXE"),
+
+my $MAKEFILE = abs_path("$FindBin::RealBin/../etc/$EXE.Makefile");
+my $WITFILE = abs_path("$FindBin::RealBin/../etc/$EXE.witticisms");
 
 # add bundles tools to PATH
 #$ENV{'PATH'} .= ":$FindBin::RealBin";
@@ -39,19 +41,22 @@ sub usage {
     "NAME\n  $EXE $VERSION\n",
     "SYNOPSIS\n  Core genome alignments from assemblues\n",
     "USAGE\n  $EXE [opts] -d OUTDIR [-r SEQ] <SEQ SEQ ...>",
-    "OPTIONS\n",
+    "BASIC\n",
     "  -h       Show this help\n",
-    "  -v       Print version and exit\n",
-    "  -i FOFN  File of input filenames\n",
-    "  -r FILE  Reference genome [use first genome]\n",
-    "  -d DIR   Output folder\n",
+    "  -V       Print version and exit\n",
+    "  -C       Check dependencies and exit\n",
     "  -j INT   Threads to use [$opt{j}]\n",
-    "  -f       Force folder overwrite\n",
-    "  -p NAME  Result file prefix [$opt{p}]\n",
-    "  -L INT   Minimum alignment block [$opt{L}]\n",
-    "  -t       Also make a tree\n",
-    "  -c FLOAT Fuzzy core percent [$opt{c}]\n",
     "  -y       Dry run, just set up folders\n",
+    "INPUT//OUTPUT\n",
+    "  -i FOFN  File of input filenames\n",
+    "  -d DIR   Output folder\n",
+    "  -f       Force folder overwrite\n",
+    "  -r FILE  Reference genome [use first genome]\n",
+    "  -p NAME  Result file prefix [$opt{p}]\n",
+    "PARAMETERS\n",
+    "  -L INT   Minimum alignment block [$opt{L}]\n",
+    "  -c FLOAT Fuzzy core percent [$opt{c}]\n",
+    "  -t       Also make a tree [FIXME]\n",
     "HOMEPAGE\n  $URL\n",
     "END\n";
   exit($errcode);
@@ -62,12 +67,28 @@ sub version {
   exit(0);
 }
 
+sub checkdeps {
+  my($exit) = @_;
+  msg("Checking $EXE dependencies...");
+  my @DEP = qw(
+    sort tee make parallel nproc
+    minimap2 any2fasta paftools.js 
+    bcftools samtools bedtools
+    goalign seqkit csvtk gotree iqtree
+  );
+  exe($_) for @DEP;;
+ 
+  msg("Installation looks good!"); 
+  exit(0) if $exit;
+}
+
 #......................................................................................
 
 
-getopts('vhftyr:c:d:L:j:p:i:', \%opt) or exit(-1);
+getopts('VChftyr:c:d:L:j:p:i:', \%opt) or exit(-1);
 
-$opt{'v'} and version();
+$opt{'V'} and version();
+$opt{'C'} and checkdeps(1);
 $opt{'h'} and usage(0);
 msg("This is $EXE $VERSION");
 #$opt{'r'} or err("Need -r reference genome");
@@ -78,10 +99,7 @@ $prefix =~ m/\s/ and err("No whitespace allowed in -p '$prefix'");
 
 @ARGV || $opt{i} or err("Need some sequence files");
 
-exe($_) for qw'sort tee make';
-exe($_) for qw'parallel minimap2 any2fasta
- paftools.js bcftools goalign sort seqkit';
-#exe('vcf-add_missing');
+checkdeps(0);
 
 my($dir,$force) = @opt{'d', 'f'};
 #msg("dir=$dir force=$force");
@@ -123,7 +141,7 @@ for my $file (@file) {
   $ref_id //= $id; # choose first genome
   msg("Checking $id =>$file");
   exists $seq{$id} and err("ID '$id' already used");
-  -f $file && -r _ or err("Problem with file '$file'");
+  -f $file && -r _ && -s _ or err("Problem with file '$file'");
   $seq{$id} = $file;
 }
 
@@ -132,10 +150,22 @@ msg("Reference: $ref_id");
 msg("Sequences:", scalar(@id));
 
 chdir($dir);
+
+msg("Preparing the run folders...");
+if (1) {
+my $input_fn = "$prefix.inputs";
+write_file($input_fn,
+  map { "$_\t$seq{$_}\n" } @id
+);  
+run(qq~parallel -k -v -j $cpus -a $input_fn --col-sep \$'\\t' "mkdir -p '{1}' && ln -f -s '{2}' '{1}/input'"~);
+}
+else {
 for my $id (@id) {
   run("mkdir -p $id");
   run("ln -f -s '$seq{$id}' '$id/input'");
 }
+}
+#msg("Just timing the symlinking"); exit;
 
 my $idfile = "$prefix.ids";
 write_file($idfile, map { "$_\n" } @id);
@@ -155,10 +185,10 @@ $opt{'y'}
 ? msg("Run pipeline:\nmake -j $cpus -C",abs_path('.'))
 : run("make -j $cpus |& tee $EXE.log");  
 
+msg( "*Did you know?\n", random_line($WITFILE) );
 msg("Done.");
 
 #......................................................................................
-
 
 sub filename_to_id {
   my($s) = @_;
@@ -202,6 +232,14 @@ sub run {
 }
 #......................................................................................
 
+sub random_line {
+  my($fname) = @_;
+  -r $fname or err("Can't read file '$fname'");
+  my @line = read_file($fname);
+  my $L = $line[ rand(@line) ];
+  chomp $L;
+  return $L;
+}
 
 
 #......................................................................................

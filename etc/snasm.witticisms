@@ -1,0 +1,5 @@
+Use -r to choose a specific reference
+Use a Genbank reference to get protein consequences
+Your genomes must be within ~5% DNA identity for this tool to work
+Try puttin -d on a fast local disk if things are slow
+Use -j to prevent all CPUs being used
