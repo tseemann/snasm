@@ -170,10 +170,19 @@ for my $id (@id) {
 my $idfile = "$prefix.ids";
 write_file($idfile, map { "$_\n" } @id);
 
+# hack to get ref genome size
+my($ref_len) = qx"any2fasta '$seq{$ref_id}' | wc -c";
+chomp $ref_len;
+$ref_len =~ m/^\d+$/ or err("Can't determine REF_LEN");
+msg("Estimated ref size: %ref_len bp");
+
+# Generate the Makefile
 my $make = "# $EXE $VERSION\n\n";
 $make .= "CPUS := $cpus\n";
 $make .= "REF := $ref_id/fna\n";
+$make .= "REF_LEN := $ref_len\n";
 $make .= "ALEN := $opt{L}\n";
+$make .= "MAPQ := 15\n";
 $make .= "OUT := $prefix\n";
 #$make .= "VCFADD := $FindBin::RealBin/vcf-add_missing\n";
 $make .= "IDFILE := $idfile\n";

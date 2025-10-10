@@ -20,6 +20,7 @@ IDS := $(shell cat $(IDFILE))
 VCF_GZ_FILES := $(addsuffix /vcf.gz,$(IDS))
 CNS_FILES := $(addsuffix /cns,$(IDS))
 ALIGNED_BED_FILES := $(addsuffix /aligned.bed,$(IDS))
+NASG_FILES := $(addsuffix /fna.msh,$(IDS))
 
 all : $(OUT).core.aln $(OUT).cov
 	csvtk pretty -H -t $(OUT).cov
@@ -30,6 +31,7 @@ $(OUT).cov : $(REF).dict $(ALIGNED_BED_FILES)
 	 | tail -n 1| cut -f1,5 \
          | sed 's/^genome/{}/' \
         " \
+        | sort -k2gr \
 	> $@
 
 $(OUT).core.aln : $(OUT).aln
@@ -103,10 +105,17 @@ $(REF).dict : $(REF)
 	samtools faidx $<
 	cut -f1,2 $(<).fai | sort > $@
 
+
 %/aligned.bed : %/paf
-	cut -f 6,8,9 $< \
+	cat $< \
+	| grep 'tp:A:[PI]' \
+	| cut -f 6,8,9 \
 	| bedtools sort -i stdin \
+	| bedtools merge -i stdin \
 	> $@
+
+#	| csvtk filter2 -I -t \
+#	  -f '$$11 >= $(MAPQ)' \
 
 ##	| csvtk mutate2 -t -H -e '$$2 + 1' \
 
@@ -118,6 +127,7 @@ $(REF).dict : $(REF)
 
 %/vcf : $(REF) %/paf
 	-paftools.js call \
+	-q $(MAPQ) \
 	-L $(ALEN) -l $(ALEN) -s $* \
 	-f $^ > $@
 
@@ -125,6 +135,13 @@ $(REF).dict : $(REF)
 	$(MINIMAP2) $+ \
 	| sort -k6,6 -k8,8n \
 	> $@
+
+%/fna.msh : %/fna
+	mash sketch \
+	-I $* \
+	-g $(REF_LEN) \
+	-o $< \
+	$<
 
 %/fna : %/input
 	any2fasta -n -u $< > $@
